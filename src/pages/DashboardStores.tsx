@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Helmet } from "react-helmet-async";
-import { Plus, Store, Settings, ExternalLink, Trash2 } from "lucide-react";
-import { mockStores, Store as StoreType } from "@/lib/mockData";
+import { Plus, Store, Settings, ExternalLink, Trash2, Loader2 } from "lucide-react";
+import { useStores, useAddStore, useDeleteStore, StoreWithSettings } from "@/hooks/useStores";
 import {
   Dialog,
   DialogContent,
@@ -14,53 +14,42 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function DashboardStores() {
-  const [stores, setStores] = useState<StoreType[]>(mockStores);
+  const { data: stores = [], isLoading } = useStores();
+  const addStore = useAddStore();
+  const deleteStore = useDeleteStore();
   const [isAddingStore, setIsAddingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreApiKey, setNewStoreApiKey] = useState("");
   const [newStoreApiUrl, setNewStoreApiUrl] = useState("");
-  const { toast } = useToast();
 
-  const handleAddStore = () => {
+  const handleAddStore = async () => {
     if (!newStoreName || !newStoreApiKey || !newStoreApiUrl) {
-      toast({
-        title: "Erro",
-        description: "Preencha todos os campos",
-        variant: "destructive",
-      });
       return;
     }
 
-    const newStore: StoreType = {
-      id: String(stores.length + 1),
+    await addStore.mutateAsync({
       name: newStoreName,
-      slug: newStoreName.toLowerCase().replace(/\s+/g, '-'),
       apiKey: newStoreApiKey,
       apiUrl: newStoreApiUrl,
-      createdAt: new Date().toISOString().split('T')[0],
-      settings: {
-        returnWindowDays: 7,
-        allowRefund: true,
-        allowStoreCredit: true,
-        storeCreditBonus: 5,
-        creditFormat: 'coupon',
-        requiresReason: true,
-        allowPartialReturns: true,
-      },
-    };
+    });
 
-    setStores([...stores, newStore]);
     setNewStoreName("");
     setNewStoreApiKey("");
     setNewStoreApiUrl("");
     setIsAddingStore(false);
-    toast({
-      title: "Loja conectada!",
-      description: `${newStoreName} foi adicionada com sucesso.`,
-    });
   };
 
   return (
@@ -103,13 +92,16 @@ export default function DashboardStores() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="apiKey">API Key</Label>
+                    <Label htmlFor="apiKey">API Key (Access Token)</Label>
                     <Input
                       id="apiKey"
-                      placeholder="nv_api_xxxxx"
+                      placeholder="Seu token de acesso"
                       value={newStoreApiKey}
                       onChange={(e) => setNewStoreApiKey(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Encontre em: Nuvem Shop → Configurações → Aplicativos → API
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="apiUrl">API URL</Label>
@@ -119,27 +111,72 @@ export default function DashboardStores() {
                       value={newStoreApiUrl}
                       onChange={(e) => setNewStoreApiUrl(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Formato: https://api.nuvemshop.com.br/v1/SEU_STORE_ID
+                    </p>
                   </div>
-                  <Button onClick={handleAddStore} className="w-full">
-                    Conectar
+                  <Button 
+                    onClick={handleAddStore} 
+                    className="w-full"
+                    disabled={addStore.isPending || !newStoreName || !newStoreApiKey || !newStoreApiUrl}
+                  >
+                    {addStore.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Validando...
+                      </>
+                    ) : (
+                      "Conectar"
+                    )}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stores.map((store) => (
-              <StoreCard key={store.id} store={store} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : stores.length === 0 ? (
+            <div className="text-center py-12">
+              <Store className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Nenhuma loja conectada</h3>
+              <p className="text-muted-foreground mb-4">
+                Conecte sua primeira loja Nuvem Shop para começar
+              </p>
+              <Button variant="hero" onClick={() => setIsAddingStore(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Conectar loja
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {stores.map((store) => (
+                <StoreCard 
+                  key={store.id} 
+                  store={store} 
+                  onDelete={() => deleteStore.mutate(store.id)}
+                  isDeleting={deleteStore.isPending}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </DashboardLayout>
     </>
   );
 }
 
-function StoreCard({ store }: { store: StoreType }) {
+function StoreCard({ 
+  store, 
+  onDelete, 
+  isDeleting 
+}: { 
+  store: StoreWithSettings; 
+  onDelete: () => void;
+  isDeleting: boolean;
+}) {
   return (
     <div className="stat-card">
       <div className="flex items-start justify-between mb-4">
@@ -150,9 +187,35 @@ function StoreCard({ store }: { store: StoreType }) {
           <Button variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => window.open(`/portal/${store.slug}`, '_blank')}
+          >
             <ExternalLink className="w-4 h-4" />
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remover loja?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação não pode ser desfeita. Todos os dados de trocas e devoluções 
+                  associados a esta loja serão removidos.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={onDelete} disabled={isDeleting}>
+                  {isDeleting ? "Removendo..." : "Remover"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
       
@@ -164,15 +227,15 @@ function StoreCard({ store }: { store: StoreType }) {
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Janela de troca</span>
-          <span>{store.settings.returnWindowDays} dias</span>
+          <span>{store.settings?.return_window_days || 7} dias</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Bônus crédito</span>
-          <span className="text-accent">+{store.settings.storeCreditBonus}%</span>
+          <span className="text-accent">+{store.settings?.store_credit_bonus || 5}%</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Conectada em</span>
-          <span>{new Date(store.createdAt).toLocaleDateString('pt-BR')}</span>
+          <span>{new Date(store.created_at).toLocaleDateString('pt-BR')}</span>
         </div>
       </div>
     </div>

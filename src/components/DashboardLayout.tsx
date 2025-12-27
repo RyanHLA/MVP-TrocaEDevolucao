@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -26,6 +27,16 @@ const navItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const userInitial = user?.user_metadata?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U';
+  const userName = user?.user_metadata?.name || 'Usuário';
+  const userEmail = user?.email || '';
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -68,17 +79,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-              <span className="text-sm font-medium">U</span>
+              <span className="text-sm font-medium">{userInitial}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">Usuário Demo</div>
-              <div className="text-xs text-muted-foreground truncate">demo@email.com</div>
+              <div className="text-sm font-medium truncate">{userName}</div>
+              <div className="text-xs text-muted-foreground truncate">{userEmail}</div>
             </div>
           </div>
           <Button 
             variant="ghost" 
             className="w-full justify-start mt-2 text-muted-foreground"
-            onClick={() => navigate('/')}
+            onClick={handleLogout}
           >
             <LogOut className="w-4 h-4 mr-2" />
             Sair

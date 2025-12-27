@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,29 +6,52 @@ import { RefreshCw, ArrowLeft, Eye, EyeOff, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Signup() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp, user, isLoading: authLoading } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate('/dashboard');
+    }
+  }, [user, authLoading, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate signup - in production, this would call the auth API
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signUp(email, password, name);
+    
+    setIsLoading(false);
+    
+    if (error) {
+      let message = "Erro ao criar conta";
+      if (error.message.includes("User already registered")) {
+        message = "Este e-mail já está cadastrado";
+      } else if (error.message.includes("Password")) {
+        message = "A senha deve ter pelo menos 6 caracteres";
+      }
       toast({
-        title: "Conta criada com sucesso!",
-        description: "Redirecionando para o dashboard...",
+        title: "Erro no cadastro",
+        description: message,
+        variant: "destructive",
       });
-      navigate('/dashboard');
-    }, 1000);
+      return;
+    }
+
+    toast({
+      title: "Conta criada com sucesso!",
+      description: "Redirecionando para o dashboard...",
+    });
+    navigate('/dashboard');
   };
 
   const benefits = [
@@ -37,6 +60,14 @@ export default function Signup() {
     "Dashboard com métricas completas",
     "Integração com Nuvem Shop",
   ];
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -102,11 +133,11 @@ export default function Signup() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Mínimo 8 caracteres"
+                    placeholder="Mínimo 6 caracteres"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={8}
+                    minLength={6}
                     className="h-12 bg-secondary/50 pr-10"
                   />
                   <button
