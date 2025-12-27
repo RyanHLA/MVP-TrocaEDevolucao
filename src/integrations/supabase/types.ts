@@ -14,7 +14,178 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      return_requests: {
+        Row: {
+          created_at: string
+          credit_value: number | null
+          customer_email: string
+          customer_name: string
+          id: string
+          items: Json
+          order_id: string
+          order_number: string
+          reason: string | null
+          resolution_type: string | null
+          status: string
+          store_id: string
+          total_value: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_value?: number | null
+          customer_email: string
+          customer_name: string
+          id?: string
+          items?: Json
+          order_id: string
+          order_number: string
+          reason?: string | null
+          resolution_type?: string | null
+          status?: string
+          store_id: string
+          total_value?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_value?: number | null
+          customer_email?: string
+          customer_name?: string
+          id?: string
+          items?: Json
+          order_id?: string
+          order_number?: string
+          reason?: string | null
+          resolution_type?: string | null
+          status?: string
+          store_id?: string
+          total_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_settings: {
+        Row: {
+          allow_partial_returns: boolean
+          allow_refund: boolean
+          allow_store_credit: boolean
+          created_at: string
+          credit_format: string
+          id: string
+          requires_reason: boolean
+          return_window_days: number
+          store_credit_bonus: number
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          allow_partial_returns?: boolean
+          allow_refund?: boolean
+          allow_store_credit?: boolean
+          created_at?: string
+          credit_format?: string
+          id?: string
+          requires_reason?: boolean
+          return_window_days?: number
+          store_credit_bonus?: number
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          allow_partial_returns?: boolean
+          allow_refund?: boolean
+          allow_store_credit?: boolean
+          created_at?: string
+          credit_format?: string
+          id?: string
+          requires_reason?: boolean
+          return_window_days?: number
+          store_credit_bonus?: number
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_settings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stores: {
+        Row: {
+          api_key: string
+          api_url: string
+          created_at: string
+          id: string
+          name: string
+          nuvemshop_store_id: string | null
+          slug: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          api_url: string
+          created_at?: string
+          id?: string
+          name: string
+          nuvemshop_store_id?: string | null
+          slug: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          api_url?: string
+          created_at?: string
+          id?: string
+          name?: string
+          nuvemshop_store_id?: string | null
+          slug?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

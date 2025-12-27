@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,29 +6,60 @@ import { RefreshCw, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, user, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate('/dashboard');
+    }
+  }, [user, authLoading, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate login - in production, this would call the auth API
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signIn(email, password);
+    
+    setIsLoading(false);
+    
+    if (error) {
+      let message = "Erro ao fazer login";
+      if (error.message.includes("Invalid login credentials")) {
+        message = "E-mail ou senha incorretos";
+      } else if (error.message.includes("Email not confirmed")) {
+        message = "Por favor, confirme seu e-mail antes de fazer login";
+      }
       toast({
-        title: "Login realizado!",
-        description: "Redirecionando para o dashboard...",
+        title: "Erro no login",
+        description: message,
+        variant: "destructive",
       });
-      navigate('/dashboard');
-    }, 1000);
+      return;
+    }
+
+    toast({
+      title: "Login realizado!",
+      description: "Redirecionando para o dashboard...",
+    });
+    navigate('/dashboard');
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <>
