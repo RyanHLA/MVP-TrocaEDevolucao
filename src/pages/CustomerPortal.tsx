@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Package, Check, Gift, CreditCard, ArrowRight, ArrowLeft } from "lucide-react";
+import { RefreshCw, Package, Check, Gift, CreditCard, ArrowRight, ArrowLeft, AlertCircle } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useToast } from "@/hooks/use-toast";
-import { mockOrder, returnReasons, mockStores } from "@/lib/mockData";
+import { returnReasons } from "@/lib/mockData";
 import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
   SelectContent,
@@ -18,41 +19,137 @@ import {
 
 type Step = 'lookup' | 'items' | 'resolution' | 'confirmation';
 
+interface OrderItem {
+  id: number;
+  productId: number;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+  sku?: string;
+}
+
+interface OrderData {
+  id: number;
+  number: string;
+  customer: {
+    name: string;
+    email: string;
+  };
+  items: OrderItem[];
+  total: number;
+  createdAt: string;
+  status: string;
+}
+
+interface StoreSettings {
+  allowRefund: boolean;
+  allowStoreCredit: boolean;
+  storeCreditBonus: number;
+  requiresReason: boolean;
+  allowPartialReturns: boolean;
+}
+
+interface EligibilityInfo {
+  isEligible: boolean;
+  daysSinceOrder: number;
+  returnWindowDays: number;
+  message: string;
+}
+
 export default function CustomerPortal() {
   const { storeSlug } = useParams();
   const { toast } = useToast();
-  const store = mockStores.find(s => s.slug === storeSlug) || mockStores[0];
-  const bonusPercent = store?.settings.storeCreditBonus || 5;
 
   const [step, setStep] = useState<Step>('lookup');
   const [orderNumber, setOrderNumber] = useState("");
   const [email, setEmail] = useState("");
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [itemReasons, setItemReasons] = useState<Record<string, string>>({});
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [itemReasons, setItemReasons] = useState<Record<number, string>>({});
   const [resolution, setResolution] = useState<'refund' | 'store_credit'>('store_credit');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Real data from API
+  const [order, setOrder] = useState<OrderData | null>(null);
+  const [settings, setSettings] = useState<StoreSettings | null>(null);
+  const [eligibility, setEligibility] = useState<EligibilityInfo | null>(null);
+  const [storeId, setStoreId] = useState<string | null>(null);
+  const [storeName, setStoreName] = useState<string>("");
 
-  const eligibleItems = mockOrder.items.filter(item => item.eligible);
+  // Fetch store name on mount
+  useEffect(() => {
+    async function fetchStoreName() {
+      if (!storeSlug) return;
+      
+      const { data } = await supabase
+        .from('stores')
+        .select('name')
+        .eq('slug', storeSlug)
+        .maybeSingle();
+      
+      if (data) {
+        setStoreName(data.name);
+      } else {
+        setStoreName(storeSlug.replace(/-/g, ' '));
+      }
+    }
+    fetchStoreName();
+  }, [storeSlug]);
+
+  const bonusPercent = settings?.storeCreditBonus || 5;
+
+  const eligibleItems = order?.items.filter(() => eligibility?.isEligible) || [];
   const selectedTotal = eligibleItems
     .filter(item => selectedItems.includes(item.id))
     .reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const bonusValue = resolution === 'store_credit' ? selectedTotal * (bonusPercent / 100) : 0;
 
-  const handleLookup = (e: React.FormEvent) => {
+  const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      if (orderNumber === "54321" || orderNumber === mockOrder.orderNumber) {
-        setStep('items');
-      } else {
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('nuvemshop', {
+        body: {
+          action: 'get-order',
+          storeSlug,
+          orderNumber,
+          customerEmail: email,
+        },
+      });
+
+      if (error || !data.success) {
         toast({
           title: "Pedido não encontrado",
-          description: "Verifique o número do pedido e tente novamente.",
+          description: data?.error || "Verifique o número do pedido e e-mail e tente novamente.",
           variant: "destructive",
         });
+        return;
       }
-    }, 1000);
+
+      setOrder(data.order);
+      setSettings(data.settings);
+      setEligibility(data.eligibility);
+      setStoreId(data.storeId);
+      
+      // Set default resolution based on settings
+      if (data.settings.allowStoreCredit) {
+        setResolution('store_credit');
+      } else if (data.settings.allowRefund) {
+        setResolution('refund');
+      }
+      
+      setStep('items');
+    } catch (err) {
+      console.error('Error fetching order:', err);
+      toast({
+        title: "Erro ao buscar pedido",
+        description: "Ocorreu um erro. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleItemSelection = () => {
@@ -66,7 +163,7 @@ export default function CustomerPortal() {
     }
 
     const missingReasons = selectedItems.filter(id => !itemReasons[id]);
-    if (store?.settings.requiresReason && missingReasons.length > 0) {
+    if (settings?.requiresReason && missingReasons.length > 0) {
       toast({
         title: "Informe o motivo",
         description: "Selecione o motivo para cada item.",
@@ -78,25 +175,76 @@ export default function CustomerPortal() {
     setStep('resolution');
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!order || !storeId) return;
+    
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    
+    try {
+      const selectedItemsData = order.items
+        .filter(item => selectedItems.includes(item.id))
+        .map(item => ({
+          id: item.id,
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          reason: itemReasons[item.id] || null,
+        }));
+
+      const creditValue = resolution === 'store_credit' ? selectedTotal + bonusValue : null;
+
+      const { error } = await supabase
+        .from('return_requests')
+        .insert({
+          store_id: storeId,
+          order_id: String(order.id),
+          order_number: order.number,
+          customer_name: order.customer.name,
+          customer_email: order.customer.email,
+          items: selectedItemsData,
+          total_value: selectedTotal,
+          credit_value: creditValue,
+          resolution_type: resolution,
+          reason: Object.values(itemReasons).join('; '),
+          status: 'pending',
+        });
+
+      if (error) {
+        console.error('Error creating return request:', error);
+        toast({
+          title: "Erro ao enviar",
+          description: "Ocorreu um erro. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setStep('confirmation');
       toast({
         title: "Solicitação enviada!",
         description: "Acompanhe o status por e-mail.",
       });
-    }, 1500);
+    } catch (err) {
+      console.error('Error submitting request:', err);
+      toast({
+        title: "Erro ao enviar",
+        description: "Ocorreu um erro. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const storeName = store?.name || storeSlug?.replace(/-/g, ' ') || "Loja Demo";
+  const displayStoreName = storeName || storeSlug?.replace(/-/g, ' ') || "Loja";
 
   return (
     <>
       <Helmet>
-        <title>Trocas e Devoluções - {storeName}</title>
-        <meta name="description" content={`Portal de trocas e devoluções da ${storeName}.`} />
+        <title>Trocas e Devoluções - {displayStoreName}</title>
+        <meta name="description" content={`Portal de trocas e devoluções da ${displayStoreName}.`} />
       </Helmet>
       <div className="min-h-screen bg-background">
         {/* Header */}
@@ -106,7 +254,7 @@ export default function CustomerPortal() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-info flex items-center justify-center">
                 <RefreshCw className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-bold">{storeName}</span>
+              <span className="font-bold">{displayStoreName}</span>
             </div>
             <span className="text-sm text-muted-foreground">Trocas e Devoluções</span>
           </div>
@@ -147,7 +295,7 @@ export default function CustomerPortal() {
                     <Label htmlFor="orderNumber">Número do pedido</Label>
                     <Input
                       id="orderNumber"
-                      placeholder="Ex: 54321"
+                      placeholder="Ex: 12345"
                       value={orderNumber}
                       onChange={(e) => setOrderNumber(e.target.value)}
                       required
@@ -176,14 +324,10 @@ export default function CustomerPortal() {
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </form>
-
-                <p className="text-center text-sm text-muted-foreground mt-6">
-                  Dica: Use o pedido <span className="font-mono bg-secondary px-2 py-1 rounded">54321</span> para testar
-                </p>
               </div>
             )}
 
-            {step === 'items' && (
+            {step === 'items' && order && (
               <div className="glass-card p-8">
                 <div className="mb-8">
                   <Button variant="ghost" size="sm" onClick={() => setStep('lookup')} className="mb-4">
@@ -196,75 +340,96 @@ export default function CustomerPortal() {
                   </p>
                 </div>
 
+                {/* Eligibility notice */}
+                {eligibility && !eligibility.isEligible && (
+                  <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-destructive">Prazo expirado</p>
+                      <p className="text-sm text-muted-foreground">{eligibility.message}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4 mb-8">
-                  {mockOrder.items.map((item) => (
-                    <div 
-                      key={item.id}
-                      className={`p-4 rounded-lg border transition-all ${
-                        item.eligible 
-                          ? 'border-border hover:border-primary cursor-pointer' 
-                          : 'border-border/50 opacity-50'
-                      } ${selectedItems.includes(item.id) ? 'border-primary bg-primary/5' : 'bg-secondary/30'}`}
-                      onClick={() => {
-                        if (!item.eligible) return;
-                        setSelectedItems(prev => 
-                          prev.includes(item.id) 
-                            ? prev.filter(id => id !== item.id)
-                            : [...prev, item.id]
-                        );
-                      }}
-                    >
-                      <div className="flex items-start gap-4">
-                        <Checkbox 
-                          checked={selectedItems.includes(item.id)}
-                          disabled={!item.eligible}
-                          className="mt-1"
-                        />
-                        <img 
-                          src={item.productImage} 
-                          alt={item.productName} 
-                          className="w-16 h-16 rounded-lg object-cover"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium">{item.productName}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Qtd: {item.quantity} • R$ {item.price.toFixed(2)}
-                          </div>
-                          {!item.eligible && (
-                            <div className="text-sm text-destructive mt-1">
-                              Fora do prazo de devolução
+                  {order.items.map((item) => {
+                    const isEligible = eligibility?.isEligible ?? true;
+                    return (
+                      <div 
+                        key={item.id}
+                        className={`p-4 rounded-lg border transition-all ${
+                          isEligible 
+                            ? 'border-border hover:border-primary cursor-pointer' 
+                            : 'border-border/50 opacity-50'
+                        } ${selectedItems.includes(item.id) ? 'border-primary bg-primary/5' : 'bg-secondary/30'}`}
+                        onClick={() => {
+                          if (!isEligible) return;
+                          setSelectedItems(prev => 
+                            prev.includes(item.id) 
+                              ? prev.filter(id => id !== item.id)
+                              : [...prev, item.id]
+                          );
+                        }}
+                      >
+                        <div className="flex items-start gap-4">
+                          <Checkbox 
+                            checked={selectedItems.includes(item.id)}
+                            disabled={!isEligible}
+                            className="mt-1"
+                          />
+                          {item.image ? (
+                            <img 
+                              src={item.image} 
+                              alt={item.name} 
+                              className="w-16 h-16 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg bg-secondary flex items-center justify-center">
+                              <Package className="w-8 h-8 text-muted-foreground" />
                             </div>
                           )}
+                          <div className="flex-1">
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Qtd: {item.quantity} • R$ {item.price.toFixed(2)}
+                            </div>
+                            {!isEligible && (
+                              <div className="text-sm text-destructive mt-1">
+                                Fora do prazo de devolução
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        
+                        {selectedItems.includes(item.id) && settings?.requiresReason && (
+                          <div className="mt-4 ml-10">
+                            <Select
+                              value={itemReasons[item.id] || ""}
+                              onValueChange={(value) => setItemReasons(prev => ({ ...prev, [item.id]: value }))}
+                            >
+                              <SelectTrigger onClick={(e) => e.stopPropagation()}>
+                                <SelectValue placeholder="Selecione o motivo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {returnReasons.map((reason) => (
+                                  <SelectItem key={reason} value={reason}>
+                                    {reason}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
-                      
-                      {selectedItems.includes(item.id) && store?.settings.requiresReason && (
-                        <div className="mt-4 ml-10">
-                          <Select
-                            value={itemReasons[item.id] || ""}
-                            onValueChange={(value) => setItemReasons(prev => ({ ...prev, [item.id]: value }))}
-                          >
-                            <SelectTrigger onClick={(e) => e.stopPropagation()}>
-                              <SelectValue placeholder="Selecione o motivo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {returnReasons.map((reason) => (
-                                <SelectItem key={reason} value={reason}>
-                                  {reason}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <Button 
                   variant="hero" 
                   className="w-full h-12"
                   onClick={handleItemSelection}
+                  disabled={!eligibility?.isEligible}
                 >
                   Continuar
                   <ArrowRight className="w-4 h-4" />
@@ -272,7 +437,7 @@ export default function CustomerPortal() {
               </div>
             )}
 
-            {step === 'resolution' && (
+            {step === 'resolution' && settings && (
               <div className="glass-card p-8">
                 <div className="mb-8">
                   <Button variant="ghost" size="sm" onClick={() => setStep('items')} className="mb-4">
@@ -286,7 +451,7 @@ export default function CustomerPortal() {
                 </div>
 
                 <div className="space-y-4 mb-8">
-                  {store?.settings.allowStoreCredit && (
+                  {settings.allowStoreCredit && (
                     <div 
                       className={`p-6 rounded-xl border-2 cursor-pointer transition-all ${
                         resolution === 'store_credit' 
@@ -322,7 +487,7 @@ export default function CustomerPortal() {
                     </div>
                   )}
 
-                  {store?.settings.allowRefund && (
+                  {settings.allowRefund && (
                     <div 
                       className={`p-6 rounded-xl border-2 cursor-pointer transition-all ${
                         resolution === 'refund' 
@@ -361,14 +526,14 @@ export default function CustomerPortal() {
               </div>
             )}
 
-            {step === 'confirmation' && (
+            {step === 'confirmation' && order && (
               <div className="glass-card p-8 text-center">
                 <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent/20 flex items-center justify-center">
                   <Check className="w-10 h-10 text-accent" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2">Solicitação enviada!</h1>
                 <p className="text-muted-foreground mb-8">
-                  Você receberá atualizações por e-mail em <strong>{email}</strong>
+                  Você receberá atualizações por e-mail em <strong>{order.customer.email}</strong>
                 </p>
 
                 <div className="bg-secondary/50 rounded-lg p-4 mb-8 text-left">
@@ -403,6 +568,21 @@ export default function CustomerPortal() {
                     <p>3. Após recebimento, seu crédito/reembolso será processado</p>
                   </div>
                 </div>
+
+                <Button 
+                  variant="outline" 
+                  className="mt-8"
+                  onClick={() => {
+                    setStep('lookup');
+                    setOrder(null);
+                    setSelectedItems([]);
+                    setItemReasons({});
+                    setOrderNumber("");
+                    setEmail("");
+                  }}
+                >
+                  Nova solicitação
+                </Button>
               </div>
             )}
           </div>
@@ -421,20 +601,20 @@ function StepIndicator({
   number: number; 
   label: string; 
   active: boolean; 
-  completed: boolean; 
+  completed: boolean;
 }) {
   return (
     <div className="flex items-center gap-2">
       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
         completed 
-          ? 'bg-accent text-accent-foreground' 
+          ? 'bg-primary text-primary-foreground' 
           : active 
             ? 'bg-primary text-primary-foreground' 
             : 'bg-secondary text-muted-foreground'
       }`}>
         {completed ? <Check className="w-4 h-4" /> : number}
       </div>
-      <span className={`text-sm hidden sm:inline ${active ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+      <span className={`text-sm hidden sm:block ${active ? 'font-medium' : 'text-muted-foreground'}`}>
         {label}
       </span>
     </div>
