@@ -1,1 +1,7 @@
 project_id = "otwhubuqkjjosejfiwos"
+
+[functions.nuvemshop]
+verify_jwt = false
+
+[functions.nuvemshop-oauth]
+verify_jwt = false

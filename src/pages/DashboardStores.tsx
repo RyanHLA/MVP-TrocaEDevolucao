@@ -1,19 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Helmet } from "react-helmet-async";
 import { Plus, Store, Settings, ExternalLink, Trash2, Loader2 } from "lucide-react";
-import { useStores, useAddStore, useDeleteStore, StoreWithSettings } from "@/hooks/useStores";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { useStores, useGetInstallUrl, useExchangeOAuthToken, useDeleteStore, StoreWithSettings } from "@/hooks/useStores";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,31 +15,61 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardStores() {
   const { data: stores = [], isLoading } = useStores();
-  const addStore = useAddStore();
+  const getInstallUrl = useGetInstallUrl();
+  const exchangeToken = useExchangeOAuthToken();
   const deleteStore = useDeleteStore();
-  const [isAddingStore, setIsAddingStore] = useState(false);
-  const [newStoreName, setNewStoreName] = useState("");
-  const [newStoreApiKey, setNewStoreApiKey] = useState("");
-  const [newStoreApiUrl, setNewStoreApiUrl] = useState("");
+  const { toast } = useToast();
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  const handleAddStore = async () => {
-    if (!newStoreName || !newStoreApiKey || !newStoreApiUrl) {
-      return;
+  // Listen for OAuth callback from popup window
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'nuvemshop-oauth-callback') {
+        const { code, state } = event.data;
+        
+        if (code && state) {
+          setIsConnecting(true);
+          try {
+            await exchangeToken.mutateAsync({ code, state });
+          } catch (error) {
+            // Error is handled by the mutation
+          } finally {
+            setIsConnecting(false);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [exchangeToken]);
+
+  const handleConnectStore = async () => {
+    setIsConnecting(true);
+    try {
+      const installUrl = await getInstallUrl.mutateAsync("Minha Loja");
+      
+      // Open NuvemShop authorization in a popup
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      window.open(
+        installUrl,
+        'nuvemshop-auth',
+        `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
+      );
+      
+      // Keep the connecting state active until we receive the callback
+      // The message listener will reset it
+    } catch (error) {
+      setIsConnecting(false);
     }
-
-    await addStore.mutateAsync({
-      name: newStoreName,
-      apiKey: newStoreApiKey,
-      apiUrl: newStoreApiUrl,
-    });
-
-    setNewStoreName("");
-    setNewStoreApiKey("");
-    setNewStoreApiUrl("");
-    setIsAddingStore(false);
   };
 
   return (
@@ -67,71 +87,23 @@ export default function DashboardStores() {
                 Gerencie suas lojas conectadas
               </p>
             </div>
-            <Dialog open={isAddingStore} onOpenChange={setIsAddingStore}>
-              <DialogTrigger asChild>
-                <Button variant="hero">
+            <Button 
+              variant="hero" 
+              onClick={handleConnectStore}
+              disabled={isConnecting}
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Conectando...
+                </>
+              ) : (
+                <>
                   <Plus className="w-4 h-4 mr-2" />
                   Conectar loja
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Conectar Nuvem Shop</DialogTitle>
-                  <DialogDescription>
-                    Insira as credenciais da API da sua loja Nuvem Shop
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="storeName">Nome da loja</Label>
-                    <Input
-                      id="storeName"
-                      placeholder="Minha Loja"
-                      value={newStoreName}
-                      onChange={(e) => setNewStoreName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="apiKey">API Key (Access Token)</Label>
-                    <Input
-                      id="apiKey"
-                      placeholder="Seu token de acesso"
-                      value={newStoreApiKey}
-                      onChange={(e) => setNewStoreApiKey(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Encontre em: Nuvem Shop → Configurações → Aplicativos → API
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="apiUrl">API URL</Label>
-                    <Input
-                      id="apiUrl"
-                      placeholder="https://api.nuvemshop.com.br/v1/123456"
-                      value={newStoreApiUrl}
-                      onChange={(e) => setNewStoreApiUrl(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Formato: https://api.nuvemshop.com.br/v1/SEU_STORE_ID
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={handleAddStore} 
-                    className="w-full"
-                    disabled={addStore.isPending || !newStoreName || !newStoreApiKey || !newStoreApiUrl}
-                  >
-                    {addStore.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Validando...
-                      </>
-                    ) : (
-                      "Conectar"
-                    )}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </>
+              )}
+            </Button>
           </div>
 
           {isLoading ? (
@@ -145,10 +117,26 @@ export default function DashboardStores() {
               <p className="text-muted-foreground mb-4">
                 Conecte sua primeira loja Nuvem Shop para começar
               </p>
-              <Button variant="hero" onClick={() => setIsAddingStore(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Conectar loja
+              <Button 
+                variant="hero" 
+                onClick={handleConnectStore}
+                disabled={isConnecting}
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Conectando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Conectar loja
+                  </>
+                )}
               </Button>
+              <p className="text-xs text-muted-foreground mt-4">
+                Ao clicar, você será redirecionado para autorizar o app na Nuvem Shop
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
