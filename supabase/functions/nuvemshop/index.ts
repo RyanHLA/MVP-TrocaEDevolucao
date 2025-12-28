@@ -146,18 +146,25 @@ serve(async (req) => {
 
         const orders: NuvemShopOrder[] = await ordersResponse.json();
         
-        // Find matching order
+        console.log(`[NuvemShop] Found ${orders.length} orders from API`);
+        if (orders.length > 0) {
+          console.log(`[NuvemShop] First order - number: "${orders[0].number}" (type: ${typeof orders[0].number}), email: "${orders[0].customer.email}"`);
+          console.log(`[NuvemShop] Looking for - number: "${orderNumber}" (type: ${typeof orderNumber}), email: "${customerEmail}"`);
+        }
+        
+        // Find matching order - compare as strings since order numbers can be numeric or string
         const order = orders.find(
-          o => o.number === orderNumber && 
+          o => String(o.number) === String(orderNumber) && 
                o.customer.email.toLowerCase() === customerEmail.toLowerCase()
         );
 
         if (!order) {
-          console.log(`[NuvemShop] Order not found or email mismatch`);
+          // Log all orders for debugging
+          console.log(`[NuvemShop] Order not found. Available orders: ${orders.map(o => `#${o.number} (${o.customer.email})`).join(', ')}`);
           return new Response(
             JSON.stringify({ 
               success: false, 
-              error: 'Pedido não encontrado ou e-mail não corresponde' 
+              error: 'Pedido não encontrado. Verifique o número do pedido e e-mail.' 
             }),
             { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
