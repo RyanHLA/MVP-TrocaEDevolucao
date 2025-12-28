@@ -42,123 +42,162 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+    }
 
-      if (action === 'exchange-token') {
-        // Exchange authorization code for access token
-        const { code, state } = await req.json();
-        
-        console.log(`[NuvemShop OAuth] Exchanging code for token`);
-        
-        // Decode state to get user info
-        let stateData: { userId: string; storeName: string };
-        try {
-          stateData = JSON.parse(atob(state));
-        } catch {
-          return new Response(
-            JSON.stringify({ success: false, error: 'Estado inválido' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+    // Handle GET request (OAuth callback redirect) - Do the full token exchange here
+    if (req.method === 'GET') {
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
 
-        // Exchange code for access token
-        const tokenResponse = await fetch('https://www.tiendanube.com/apps/authorize/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            client_id: NUVEMSHOP_CLIENT_ID,
-            client_secret: NUVEMSHOP_CLIENT_SECRET,
-            grant_type: 'authorization_code',
-            code,
-          }),
-        });
+      console.log(`[NuvemShop OAuth] Received callback with code: ${code ? 'present' : 'missing'}, state: ${state ? 'present' : 'missing'}`);
 
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          console.error(`[NuvemShop OAuth] Token exchange failed: ${tokenResponse.status} - ${errorText}`);
-          return new Response(
-            JSON.stringify({ success: false, error: 'Falha ao obter token de acesso' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        const tokenData = await tokenResponse.json();
-        const { access_token, user_id: nuvemshopStoreId, scope } = tokenData;
-
-        console.log(`[NuvemShop OAuth] Token obtained for store ${nuvemshopStoreId}`);
-
-        // Fetch store info to get the name
-        const storeResponse = await fetch(
-          `https://api.tiendanube.com/v1/${nuvemshopStoreId}/store`,
-          {
-            headers: {
-              'Authentication': `bearer ${access_token}`,
-              'Content-Type': 'application/json',
-              'User-Agent': 'Trocas.app (support@trocas.app)',
-            },
-          }
+      if (!code || !state) {
+        console.error('[NuvemShop OAuth] Missing code or state in callback');
+        return new Response(
+          `<!DOCTYPE html>
+          <html>
+            <head><meta charset="utf-8"><title>Erro</title></head>
+            <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white;">
+              <div style="text-align: center; padding: 2rem;">
+                <h1>Erro na autenticação</h1>
+                <p>Parâmetros inválidos. Por favor, tente novamente.</p>
+                <script>setTimeout(() => window.close(), 3000);</script>
+              </div>
+            </body>
+          </html>`,
+          { headers: { 'Content-Type': 'text/html' } }
         );
+      }
 
-        let storeInfo = { name: stateData.storeName };
-        if (storeResponse.ok) {
-          const storeData = await storeResponse.json();
-          storeInfo.name = storeData.name?.pt || storeData.name?.es || storeData.name?.en || stateData.storeName;
+      // Decode state to get user info
+      let stateData: { userId: string; storeName: string };
+      try {
+        stateData = JSON.parse(atob(state));
+        console.log(`[NuvemShop OAuth] State decoded for user ${stateData.userId}`);
+      } catch (e) {
+        console.error('[NuvemShop OAuth] Failed to decode state:', e);
+        return new Response(
+          `<!DOCTYPE html>
+          <html>
+            <head><meta charset="utf-8"><title>Erro</title></head>
+            <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white;">
+              <div style="text-align: center; padding: 2rem;">
+                <h1>Erro na autenticação</h1>
+                <p>Estado inválido. Por favor, tente novamente.</p>
+                <script>setTimeout(() => window.close(), 3000);</script>
+              </div>
+            </body>
+          </html>`,
+          { headers: { 'Content-Type': 'text/html' } }
+        );
+      }
+
+      // Exchange code for access token
+      console.log(`[NuvemShop OAuth] Exchanging code for token...`);
+      
+      const tokenResponse = await fetch('https://www.tiendanube.com/apps/authorize/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: NUVEMSHOP_CLIENT_ID,
+          client_secret: NUVEMSHOP_CLIENT_SECRET,
+          grant_type: 'authorization_code',
+          code,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error(`[NuvemShop OAuth] Token exchange failed: ${tokenResponse.status} - ${errorText}`);
+        return new Response(
+          `<!DOCTYPE html>
+          <html>
+            <head><meta charset="utf-8"><title>Erro</title></head>
+            <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white;">
+              <div style="text-align: center; padding: 2rem;">
+                <h1>Erro na autenticação</h1>
+                <p>Falha ao obter token de acesso. Por favor, tente novamente.</p>
+                <script>setTimeout(() => window.close(), 3000);</script>
+              </div>
+            </body>
+          </html>`,
+          { headers: { 'Content-Type': 'text/html' } }
+        );
+      }
+
+      const tokenData = await tokenResponse.json();
+      const { access_token, user_id: nuvemshopStoreId } = tokenData;
+
+      console.log(`[NuvemShop OAuth] Token obtained for store ${nuvemshopStoreId}`);
+
+      // Fetch store info to get the name
+      const storeResponse = await fetch(
+        `https://api.tiendanube.com/v1/${nuvemshopStoreId}/store`,
+        {
+          headers: {
+            'Authentication': `bearer ${access_token}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'Trocas.app (support@trocas.app)',
+          },
         }
+      );
 
-        // Create slug from store name
-        const slug = storeInfo.name
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/g, '');
+      let storeName = stateData.storeName;
+      if (storeResponse.ok) {
+        const storeData = await storeResponse.json();
+        storeName = storeData.name?.pt || storeData.name?.es || storeData.name?.en || stateData.storeName;
+        console.log(`[NuvemShop OAuth] Store name fetched: ${storeName}`);
+      }
 
-        // API URL for this store
-        const apiUrl = `https://api.tiendanube.com/v1/${nuvemshopStoreId}`;
+      // Create slug from store name
+      const slug = storeName
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
 
-        // Check if store already exists
-        const { data: existingStore } = await supabase
+      // API URL for this store
+      const apiUrl = `https://api.tiendanube.com/v1/${nuvemshopStoreId}`;
+
+      // Check if store already exists
+      const { data: existingStore } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('nuvemshop_store_id', nuvemshopStoreId.toString())
+        .eq('user_id', stateData.userId)
+        .maybeSingle();
+
+      let storeId: string;
+      let updated = false;
+
+      if (existingStore) {
+        // Update existing store with new token
+        const { error: updateError } = await supabase
           .from('stores')
-          .select('id')
-          .eq('nuvemshop_store_id', nuvemshopStoreId.toString())
-          .eq('user_id', stateData.userId)
-          .maybeSingle();
+          .update({
+            api_key: access_token,
+            api_url: apiUrl,
+            name: storeName,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingStore.id);
 
-        if (existingStore) {
-          // Update existing store with new token
-          const { error: updateError } = await supabase
-            .from('stores')
-            .update({
-              api_key: access_token,
-              api_url: apiUrl,
-              name: storeInfo.name,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingStore.id);
-
-          if (updateError) {
-            console.error(`[NuvemShop OAuth] Failed to update store: ${updateError.message}`);
-            throw updateError;
-          }
-
-          console.log(`[NuvemShop OAuth] Updated existing store ${existingStore.id}`);
-          
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              storeId: existingStore.id,
-              storeName: storeInfo.name,
-              updated: true,
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+        if (updateError) {
+          console.error(`[NuvemShop OAuth] Failed to update store: ${updateError.message}`);
+          throw updateError;
         }
 
+        storeId = existingStore.id;
+        updated = true;
+        console.log(`[NuvemShop OAuth] Updated existing store ${storeId}`);
+      } else {
         // Create new store
         const { data: newStore, error: storeError } = await supabase
           .from('stores')
           .insert({
             user_id: stateData.userId,
-            name: storeInfo.name,
+            name: storeName,
             slug,
             api_key: access_token,
             api_url: apiUrl,
@@ -171,6 +210,8 @@ serve(async (req) => {
           console.error(`[NuvemShop OAuth] Failed to create store: ${storeError.message}`);
           throw storeError;
         }
+
+        storeId = newStore.id;
 
         // Create default settings
         const { error: settingsError } = await supabase
@@ -190,49 +231,16 @@ serve(async (req) => {
           console.error(`[NuvemShop OAuth] Failed to create settings: ${settingsError.message}`);
         }
 
-        console.log(`[NuvemShop OAuth] Created new store ${newStore.id}`);
-
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            storeId: newStore.id,
-            storeName: storeInfo.name,
-            updated: false,
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Handle GET request (OAuth callback redirect)
-    if (req.method === 'GET') {
-      const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
-
-      if (!code || !state) {
-        console.error('[NuvemShop OAuth] Missing code or state in callback');
-        return new Response(
-          `<html>
-            <head><meta charset="utf-8"><title>Erro</title></head>
-            <body>
-              <h1>Erro na autenticação</h1>
-              <p>Parâmetros inválidos. Por favor, tente novamente.</p>
-              <script>
-                setTimeout(() => window.close(), 3000);
-              </script>
-            </body>
-          </html>`,
-          { headers: { 'Content-Type': 'text/html' } }
-        );
+        console.log(`[NuvemShop OAuth] Created new store ${storeId}`);
       }
 
-      // Return HTML that will communicate with the parent window
+      // Return success HTML that notifies parent window and closes
       return new Response(
         `<!DOCTYPE html>
         <html>
           <head>
             <meta charset="utf-8">
-            <title>Conectando loja...</title>
+            <title>Loja Conectada</title>
             <style>
               body {
                 font-family: system-ui, sans-serif;
@@ -248,49 +256,47 @@ serve(async (req) => {
                 text-align: center;
                 padding: 2rem;
               }
-              .spinner {
-                width: 40px;
-                height: 40px;
-                border: 3px solid rgba(255,255,255,0.3);
-                border-top-color: #3b82f6;
+              .success-icon {
+                width: 60px;
+                height: 60px;
                 border-radius: 50%;
-                animation: spin 1s linear infinite;
+                background: #22c55e;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 margin: 0 auto 1rem;
               }
-              @keyframes spin {
-                to { transform: rotate(360deg); }
+              .success-icon svg {
+                width: 32px;
+                height: 32px;
+                stroke: white;
+                stroke-width: 3;
+                fill: none;
               }
             </style>
           </head>
           <body>
             <div class="container">
-              <div class="spinner"></div>
-              <h2>Conectando sua loja...</h2>
-              <p>Por favor, aguarde.</p>
+              <div class="success-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+              <h2>${updated ? 'Loja atualizada!' : 'Loja conectada!'}</h2>
+              <p>${storeName} foi ${updated ? 'atualizada' : 'adicionada'} com sucesso.</p>
+              <p style="color: #94a3b8; font-size: 0.875rem; margin-top: 1rem;">Esta janela fechará automaticamente...</p>
             </div>
             <script>
-              const code = '${code}';
-              const state = '${state}';
-              
-              // Send message to parent window
+              // Notify parent window to refresh stores list
               if (window.opener) {
                 window.opener.postMessage({
-                  type: 'nuvemshop-oauth-callback',
-                  code,
-                  state,
+                  type: 'nuvemshop-oauth-success',
+                  storeId: '${storeId}',
+                  storeName: '${storeName.replace(/'/g, "\\'")}',
+                  updated: ${updated}
                 }, '*');
               }
               
-              // Close this window after a short delay
-              setTimeout(() => {
-                document.body.innerHTML = \`
-                  <div class="container">
-                    <h2>Loja conectada!</h2>
-                    <p>Você pode fechar esta janela.</p>
-                  </div>
-                \`;
-                setTimeout(() => window.close(), 2000);
-              }, 1000);
+              // Close this window after a delay
+              setTimeout(() => window.close(), 2000);
             </script>
           </body>
         </html>`,
@@ -306,8 +312,18 @@ serve(async (req) => {
     console.error('[NuvemShop OAuth] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      `<!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"><title>Erro</title></head>
+        <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white;">
+          <div style="text-align: center; padding: 2rem;">
+            <h1>Erro</h1>
+            <p>${errorMessage}</p>
+            <script>setTimeout(() => window.close(), 3000);</script>
+          </div>
+        </body>
+      </html>`,
+      { headers: { 'Content-Type': 'text/html' } }
     );
   }
 });

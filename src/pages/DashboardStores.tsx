@@ -3,7 +3,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Helmet } from "react-helmet-async";
 import { Plus, Store, Settings, ExternalLink, Trash2, Loader2 } from "lucide-react";
-import { useStores, useGetInstallUrl, useExchangeOAuthToken, useDeleteStore, StoreWithSettings } from "@/hooks/useStores";
+import { useStores, useGetInstallUrl, useDeleteStore, StoreWithSettings } from "@/hooks/useStores";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,33 +21,32 @@ import { useToast } from "@/hooks/use-toast";
 export default function DashboardStores() {
   const { data: stores = [], isLoading } = useStores();
   const getInstallUrl = useGetInstallUrl();
-  const exchangeToken = useExchangeOAuthToken();
   const deleteStore = useDeleteStore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Listen for OAuth callback from popup window
+  // Listen for OAuth success from popup window
   useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      if (event.data?.type === 'nuvemshop-oauth-callback') {
-        const { code, state } = event.data;
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'nuvemshop-oauth-success') {
+        const { storeName, updated } = event.data;
         
-        if (code && state) {
-          setIsConnecting(true);
-          try {
-            await exchangeToken.mutateAsync({ code, state });
-          } catch (error) {
-            // Error is handled by the mutation
-          } finally {
-            setIsConnecting(false);
-          }
-        }
+        // Refresh stores list
+        queryClient.invalidateQueries({ queryKey: ['stores'] });
+        
+        toast({
+          title: updated ? "Loja atualizada!" : "Loja conectada!",
+          description: `${storeName} foi ${updated ? 'atualizada' : 'adicionada'} com sucesso.`,
+        });
+        
+        setIsConnecting(false);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [exchangeToken]);
+  }, [queryClient, toast]);
 
   const handleConnectStore = async () => {
     setIsConnecting(true);
