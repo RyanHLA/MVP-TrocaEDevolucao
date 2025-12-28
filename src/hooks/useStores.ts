@@ -53,78 +53,71 @@ export function useStores() {
   });
 }
 
-export function useAddStore() {
+export function useGetInstallUrl() {
   const { user } = useAuth();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (storeName: string): Promise<string> => {
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { data, error } = await supabase.functions.invoke('nuvemshop-oauth', {
+        body: {
+          action: 'get-install-url',
+          userId: user.id,
+          storeName,
+        },
+      });
+
+      if (error) {
+        throw new Error("Erro ao gerar URL de instalação: " + error.message);
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Falha ao gerar URL de instalação");
+      }
+
+      return data.installUrl;
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useExchangeOAuthToken() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ name, apiKey, apiUrl }: { name: string; apiKey: string; apiUrl: string }) => {
-      if (!user) throw new Error("Usuário não autenticado");
-
-      // First validate the API credentials
-      const { data: validationResult, error: validationError } = await supabase.functions.invoke('nuvemshop', {
+    mutationFn: async ({ code, state }: { code: string; state: string }) => {
+      const { data, error } = await supabase.functions.invoke('nuvemshop-oauth', {
         body: {
-          action: 'validate',
-          apiKey,
-          apiUrl,
+          action: 'exchange-token',
+          code,
+          state,
         },
       });
 
-      if (validationError) {
-        throw new Error("Erro ao validar credenciais: " + validationError.message);
+      if (error) {
+        throw new Error("Erro ao conectar loja: " + error.message);
       }
 
-      if (!validationResult?.success) {
-        throw new Error(validationResult?.error || "Credenciais inválidas");
+      if (!data?.success) {
+        throw new Error(data?.error || "Falha ao conectar loja");
       }
 
-      const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-
-      // Create the store
-      const { data: store, error: storeError } = await supabase
-        .from('stores')
-        .insert({
-          user_id: user.id,
-          name,
-          slug,
-          api_key: apiKey,
-          api_url: apiUrl,
-          nuvemshop_store_id: validationResult.store?.id?.toString() || null,
-        })
-        .select()
-        .single();
-
-      if (storeError) {
-        if (storeError.code === '23505') {
-          throw new Error("Já existe uma loja com esse nome");
-        }
-        throw storeError;
-      }
-
-      // Create default settings
-      const { error: settingsError } = await supabase
-        .from('store_settings')
-        .insert({
-          store_id: store.id,
-          return_window_days: 7,
-          allow_refund: true,
-          allow_store_credit: true,
-          store_credit_bonus: 5,
-          credit_format: 'coupon',
-          requires_reason: true,
-          allow_partial_returns: true,
-        });
-
-      if (settingsError) throw settingsError;
-
-      return store;
+      return data;
     },
-    onSuccess: (store) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['stores'] });
       toast({
-        title: "Loja conectada!",
-        description: `${store.name} foi adicionada com sucesso.`,
+        title: data.updated ? "Loja atualizada!" : "Loja conectada!",
+        description: `${data.storeName} foi ${data.updated ? 'atualizada' : 'adicionada'} com sucesso.`,
       });
     },
     onError: (error: Error) => {
