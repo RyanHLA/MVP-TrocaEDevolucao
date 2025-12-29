@@ -136,22 +136,56 @@ export function useUpdateRequestStatus() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' | 'completed' }) => {
+    mutationFn: async ({ 
+      id, 
+      status, 
+      customerEmail, 
+      customerName, 
+      orderNumber, 
+      storeName 
+    }: { 
+      id: string; 
+      status: 'approved' | 'rejected' | 'completed';
+      customerEmail: string;
+      customerName: string;
+      orderNumber: string;
+      storeName: string;
+    }) => {
+      // Update status in database
       const { error } = await supabase
         .from('return_requests')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Send email notification
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-return-notification', {
+          body: {
+            customerEmail,
+            customerName,
+            orderNumber,
+            status,
+            storeName,
+          },
+        });
+
+        if (emailError) {
+          console.error('Error sending email notification:', emailError);
+        }
+      } catch (emailErr) {
+        console.error('Failed to send email notification:', emailErr);
+      }
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['return-requests'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
       
       const messages = {
-        approved: { title: "Solicitação aprovada", description: "O cliente será notificado." },
-        rejected: { title: "Solicitação rejeitada", description: "O cliente será notificado." },
-        completed: { title: "Solicitação concluída", description: "Troca/devolução finalizada." },
+        approved: { title: "Solicitação aprovada", description: "O cliente foi notificado por email." },
+        rejected: { title: "Solicitação rejeitada", description: "O cliente foi notificado por email." },
+        completed: { title: "Solicitação concluída", description: "O cliente foi notificado por email." },
       };
       
       toast(messages[status]);

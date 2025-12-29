@@ -33,16 +33,42 @@ export default function DashboardRequests() {
   
   const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
 
-  const handleApprove = (id: string) => {
-    updateStatus.mutate({ id, status: 'approved' });
+  const getStoreName = (storeId: string) => {
+    const store = stores?.find(s => s.id === storeId);
+    return store?.name || 'Loja';
   };
 
-  const handleReject = (id: string) => {
-    updateStatus.mutate({ id, status: 'rejected' });
+  const handleApprove = (request: ReturnRequest) => {
+    updateStatus.mutate({ 
+      id: request.id, 
+      status: 'approved',
+      customerEmail: request.customer_email,
+      customerName: request.customer_name,
+      orderNumber: request.order_number,
+      storeName: getStoreName(request.store_id),
+    });
   };
 
-  const handleComplete = (id: string) => {
-    updateStatus.mutate({ id, status: 'completed' });
+  const handleReject = (request: ReturnRequest) => {
+    updateStatus.mutate({ 
+      id: request.id, 
+      status: 'rejected',
+      customerEmail: request.customer_email,
+      customerName: request.customer_name,
+      orderNumber: request.order_number,
+      storeName: getStoreName(request.store_id),
+    });
+  };
+
+  const handleComplete = (request: ReturnRequest) => {
+    updateStatus.mutate({ 
+      id: request.id, 
+      status: 'completed',
+      customerEmail: request.customer_email,
+      customerName: request.customer_name,
+      orderNumber: request.order_number,
+      storeName: getStoreName(request.store_id),
+    });
   };
 
   const getStatusBadge = (status: ReturnRequest['status']) => {
@@ -162,7 +188,7 @@ export default function DashboardRequests() {
                                     variant="ghost"
                                     size="icon"
                                     className="text-accent hover:text-accent"
-                                    onClick={() => handleApprove(request.id)}
+                                    onClick={() => handleApprove(request)}
                                     disabled={updateStatus.isPending}
                                   >
                                     {updateStatus.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -171,7 +197,7 @@ export default function DashboardRequests() {
                                     variant="ghost"
                                     size="icon"
                                     className="text-destructive hover:text-destructive"
-                                    onClick={() => handleReject(request.id)}
+                                    onClick={() => handleReject(request)}
                                     disabled={updateStatus.isPending}
                                   >
                                     <X className="w-4 h-4" />
@@ -183,7 +209,7 @@ export default function DashboardRequests() {
                                   variant="ghost"
                                   size="sm"
                                   className="text-accent hover:text-accent"
-                                  onClick={() => handleComplete(request.id)}
+                                  onClick={() => handleComplete(request)}
                                   disabled={updateStatus.isPending}
                                 >
                                   <Package className="w-4 h-4 mr-1" />
