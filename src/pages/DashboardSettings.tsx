@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Helmet } from "react-helmet-async";
-import { useStores } from "@/hooks/useStores";
+import { useStores, useUpdateStoreAddress, StoreAddressData } from "@/hooks/useStores";
 import { useStoreSettings, useUpdateStoreSettings } from "@/hooks/useStoreSettings";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, MapPin } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -17,11 +17,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const BRAZILIAN_STATES = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+];
+
 export default function DashboardSettings() {
   const { data: stores, isLoading: storesLoading } = useStores();
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   
-  // Set first store as default when stores load
   useEffect(() => {
     if (stores && stores.length > 0 && !selectedStoreId) {
       setSelectedStoreId(stores[0].id);
@@ -30,6 +34,9 @@ export default function DashboardSettings() {
   
   const { data: existingSettings, isLoading: settingsLoading } = useStoreSettings(selectedStoreId);
   const updateSettings = useUpdateStoreSettings();
+  const updateAddress = useUpdateStoreAddress();
+  
+  const selectedStore = stores?.find(s => s.id === selectedStoreId);
   
   const [settings, setSettings] = useState({
     return_window_days: 7,
@@ -39,6 +46,18 @@ export default function DashboardSettings() {
     credit_format: 'coupon' as 'coupon' | 'native',
     requires_reason: true,
     allow_partial_returns: true,
+  });
+
+  const [address, setAddress] = useState<StoreAddressData>({
+    address_street: '',
+    address_number: '',
+    address_complement: '',
+    address_district: '',
+    address_city: '',
+    address_state: '',
+    address_postal_code: '',
+    phone: '',
+    document: '',
   });
 
   // Update local state when settings load
@@ -67,12 +86,31 @@ export default function DashboardSettings() {
     }
   }, [existingSettings, selectedStoreId, settingsLoading]);
 
+  // Load store address when store changes
+  useEffect(() => {
+    if (selectedStore) {
+      setAddress({
+        address_street: selectedStore.address_street || '',
+        address_number: selectedStore.address_number || '',
+        address_complement: selectedStore.address_complement || '',
+        address_district: selectedStore.address_district || '',
+        address_city: selectedStore.address_city || '',
+        address_state: selectedStore.address_state || '',
+        address_postal_code: selectedStore.address_postal_code || '',
+        phone: selectedStore.phone || '',
+        document: selectedStore.document || '',
+      });
+    }
+  }, [selectedStore]);
+
   const handleSave = () => {
     if (!selectedStoreId) return;
-    updateSettings.mutate({
-      storeId: selectedStoreId,
-      settings,
-    });
+    updateSettings.mutate({ storeId: selectedStoreId, settings });
+  };
+
+  const handleSaveAddress = () => {
+    if (!selectedStoreId) return;
+    updateAddress.mutate({ storeId: selectedStoreId, address });
   };
 
   const isLoading = storesLoading || settingsLoading;
@@ -289,6 +327,105 @@ export default function DashboardSettings() {
                 {updateSettings.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Salvar configurações
               </Button>
+
+              {/* Store Address for Shipping */}
+              <div className="glass-card p-6 space-y-6">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Endereço da Loja (Logística Reversa)</h2>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Configure o endereço de destino para receber os produtos devolvidos via Melhor Envio.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>CNPJ</Label>
+                    <Input
+                      placeholder="00.000.000/0001-00"
+                      value={address.document}
+                      onChange={(e) => setAddress({ ...address, document: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Telefone</Label>
+                    <Input
+                      placeholder="(11) 99999-9999"
+                      value={address.phone}
+                      onChange={(e) => setAddress({ ...address, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CEP</Label>
+                    <Input
+                      placeholder="00000-000"
+                      value={address.address_postal_code}
+                      onChange={(e) => setAddress({ ...address, address_postal_code: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Estado</Label>
+                    <Select value={address.address_state} onValueChange={(v) => setAddress({ ...address, address_state: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="UF" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BRAZILIAN_STATES.map(uf => (
+                          <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Cidade</Label>
+                    <Input
+                      placeholder="São Paulo"
+                      value={address.address_city}
+                      onChange={(e) => setAddress({ ...address, address_city: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Bairro</Label>
+                    <Input
+                      placeholder="Centro"
+                      value={address.address_district}
+                      onChange={(e) => setAddress({ ...address, address_district: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Rua</Label>
+                    <Input
+                      placeholder="Rua Exemplo"
+                      value={address.address_street}
+                      onChange={(e) => setAddress({ ...address, address_street: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Número</Label>
+                    <Input
+                      placeholder="123"
+                      value={address.address_number}
+                      onChange={(e) => setAddress({ ...address, address_number: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Complemento</Label>
+                    <Input
+                      placeholder="Sala 1"
+                      value={address.address_complement}
+                      onChange={(e) => setAddress({ ...address, address_complement: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleSaveAddress}
+                  disabled={updateAddress.isPending}
+                >
+                  {updateAddress.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Salvar endereço
+                </Button>
+              </div>
             </>
           )}
         </div>
