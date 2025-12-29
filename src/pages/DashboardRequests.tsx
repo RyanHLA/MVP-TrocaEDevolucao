@@ -73,10 +73,10 @@ export default function DashboardRequests() {
 
   const getStatusBadge = (status: ReturnRequest['status']) => {
     const config = {
-      pending: { label: 'Pendente', variant: 'outline' as const, icon: Clock },
-      approved: { label: 'Aprovado', variant: 'default' as const, icon: CheckCircle },
-      rejected: { label: 'Rejeitado', variant: 'destructive' as const, icon: XCircle },
-      completed: { label: 'Concluído', variant: 'secondary' as const, icon: Package },
+      pending: { label: 'Pendente', variant: 'pending-soft' as const, icon: Clock },
+      approved: { label: 'Aprovado', variant: 'approved-soft' as const, icon: CheckCircle },
+      rejected: { label: 'Rejeitado', variant: 'rejected-soft' as const, icon: XCircle },
+      completed: { label: 'Concluído', variant: 'completed-soft' as const, icon: Package },
     };
     const { label, variant, icon: Icon } = config[status];
     return (
@@ -94,17 +94,17 @@ export default function DashboardRequests() {
         <meta name="description" content="Gerencie solicitações de troca e devolução." />
       </Helmet>
       <DashboardLayout>
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-6 animate-fade-in">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Solicitações</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-semibold mb-1">Solicitações</h1>
+              <p className="text-sm text-muted-foreground">
                 Gerencie as solicitações de troca e devolução
               </p>
             </div>
             
             {stores && stores.length > 0 && (
-              <div className="w-full md:w-64">
+              <div className="w-full md:w-56">
                 <Label className="text-xs text-muted-foreground mb-1">Filtrar por loja</Label>
                 <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
                   <SelectTrigger>
@@ -124,53 +124,53 @@ export default function DashboardRequests() {
           </div>
 
           {isLoading ? (
-            <div className="glass-card p-6 space-y-4">
+            <div className="bg-card border border-border rounded-lg p-6 space-y-3">
               {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={i} className="h-14 w-full" />
               ))}
             </div>
           ) : requests && requests.length > 0 ? (
-            <div className="glass-card overflow-hidden">
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="border-b border-border">
+                  <thead className="border-b border-border bg-muted/30">
                     <tr>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Pedido</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Cliente</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Resolução</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Valor</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Data</th>
-                      <th className="text-right p-4 font-medium text-muted-foreground">Ações</th>
+                      <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Pedido</th>
+                      <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cliente</th>
+                      <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Resolução</th>
+                      <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor</th>
+                      <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                      <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Data</th>
+                      <th className="text-right p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border">
                     {requests.map((request) => {
                       const bonusValue = request.credit_value ? Number(request.credit_value) - Number(request.total_value) : 0;
                       return (
-                        <tr key={request.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                          <td className="p-4 font-medium">#{request.order_number}</td>
+                        <tr key={request.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="p-4 font-medium text-sm">#{request.order_number}</td>
                           <td className="p-4">
                             <div>
-                              <div className="font-medium">{request.customer_name}</div>
-                              <div className="text-sm text-muted-foreground">{request.customer_email}</div>
+                              <div className="font-medium text-sm">{request.customer_name}</div>
+                              <div className="text-xs text-muted-foreground">{request.customer_email}</div>
                             </div>
                           </td>
                           <td className="p-4">
-                            <Badge variant={request.resolution_type === 'store_credit' ? 'default' : 'outline'} className={request.resolution_type === 'store_credit' ? 'bg-accent text-accent-foreground' : ''}>
+                            <Badge variant={request.resolution_type === 'store_credit' ? 'approved-soft' : 'outline'}>
                               {request.resolution_type === 'store_credit' ? 'Crédito na loja' : 'Reembolso'}
                             </Badge>
                           </td>
                           <td className="p-4">
                             <div>
-                              <div>R$ {Number(request.total_value).toFixed(2)}</div>
+                              <div className="text-sm">R$ {Number(request.total_value).toFixed(2)}</div>
                               {bonusValue > 0 && (
-                                <div className="text-sm text-accent">+R$ {bonusValue.toFixed(2)} bônus</div>
+                                <div className="text-xs text-success">+R$ {bonusValue.toFixed(2)} bônus</div>
                               )}
                             </div>
                           </td>
                           <td className="p-4">{getStatusBadge(request.status)}</td>
-                          <td className="p-4 text-muted-foreground">
+                          <td className="p-4 text-sm text-muted-foreground">
                             {new Date(request.created_at).toLocaleDateString('pt-BR')}
                           </td>
                           <td className="p-4">
@@ -226,7 +226,7 @@ export default function DashboardRequests() {
               </div>
             </div>
           ) : (
-            <div className="glass-card p-12 text-center">
+            <div className="bg-card border border-border rounded-lg p-12 text-center">
               <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
               <h3 className="text-lg font-medium mb-2">Nenhuma solicitação</h3>
               <p className="text-muted-foreground">
