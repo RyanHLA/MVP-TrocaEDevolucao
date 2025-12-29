@@ -170,14 +170,42 @@ serve(async (req) => {
           );
         }
 
-        // Check eligibility based on settings
+        console.log(`[NuvemShop] Order ${order.number} - payment_status: ${order.payment_status}, shipping_status: ${order.shipping_status}`);
+
+        // Check if order is paid
+        const isPaid = order.payment_status === 'paid';
+        if (!isPaid) {
+          console.log(`[NuvemShop] Order ${order.number} rejected: not paid (status: ${order.payment_status})`);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Este pedido ainda não foi pago. Trocas e devoluções só são permitidas para pedidos pagos.' 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Check if order is delivered
+        const isDelivered = order.shipping_status === 'delivered';
+        if (!isDelivered) {
+          console.log(`[NuvemShop] Order ${order.number} rejected: not delivered (status: ${order.shipping_status})`);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Este pedido ainda não foi entregue. Trocas e devoluções só são permitidas após a entrega.' 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Check eligibility based on settings (return window)
         const orderDate = new Date(order.created_at);
         const now = new Date();
         const daysSinceOrder = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
         const returnWindowDays = settings?.return_window_days || 7;
         const isEligible = daysSinceOrder <= returnWindowDays;
 
-        console.log(`[NuvemShop] Order ${order.number} found, eligible: ${isEligible} (${daysSinceOrder}/${returnWindowDays} days)`);
+        console.log(`[NuvemShop] Order ${order.number} found, paid: ${isPaid}, delivered: ${isDelivered}, eligible: ${isEligible} (${daysSinceOrder}/${returnWindowDays} days)`);
 
         return new Response(
           JSON.stringify({
