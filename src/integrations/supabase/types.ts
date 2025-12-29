@@ -45,49 +45,85 @@ export type Database = {
         Row: {
           created_at: string
           credit_value: number | null
+          customer_address: string | null
+          customer_address_number: string | null
+          customer_city: string | null
+          customer_district: string | null
           customer_email: string
           customer_name: string
+          customer_phone: string | null
+          customer_postal_code: string | null
+          customer_state: string | null
           id: string
           items: Json
+          label_url: string | null
           order_id: string
           order_number: string
           reason: string | null
           resolution_type: string | null
+          shipping_cost: number | null
+          shipping_id: string | null
+          shipping_provider: string | null
           status: string
           store_id: string
           total_value: number
+          tracking_code: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           credit_value?: number | null
+          customer_address?: string | null
+          customer_address_number?: string | null
+          customer_city?: string | null
+          customer_district?: string | null
           customer_email: string
           customer_name: string
+          customer_phone?: string | null
+          customer_postal_code?: string | null
+          customer_state?: string | null
           id?: string
           items?: Json
+          label_url?: string | null
           order_id: string
           order_number: string
           reason?: string | null
           resolution_type?: string | null
+          shipping_cost?: number | null
+          shipping_id?: string | null
+          shipping_provider?: string | null
           status?: string
           store_id: string
           total_value?: number
+          tracking_code?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           credit_value?: number | null
+          customer_address?: string | null
+          customer_address_number?: string | null
+          customer_city?: string | null
+          customer_district?: string | null
           customer_email?: string
           customer_name?: string
+          customer_phone?: string | null
+          customer_postal_code?: string | null
+          customer_state?: string | null
           id?: string
           items?: Json
+          label_url?: string | null
           order_id?: string
           order_number?: string
           reason?: string | null
           resolution_type?: string | null
+          shipping_cost?: number | null
+          shipping_id?: string | null
+          shipping_provider?: string | null
           status?: string
           store_id?: string
           total_value?: number
+          tracking_code?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -152,34 +188,61 @@ export type Database = {
       }
       stores: {
         Row: {
+          address_city: string | null
+          address_complement: string | null
+          address_district: string | null
+          address_number: string | null
+          address_postal_code: string | null
+          address_state: string | null
+          address_street: string | null
           api_key: string
           api_url: string
           created_at: string
+          document: string | null
           id: string
           name: string
           nuvemshop_store_id: string | null
+          phone: string | null
           slug: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_district?: string | null
+          address_number?: string | null
+          address_postal_code?: string | null
+          address_state?: string | null
+          address_street?: string | null
           api_key: string
           api_url: string
           created_at?: string
+          document?: string | null
           id?: string
           name: string
           nuvemshop_store_id?: string | null
+          phone?: string | null
           slug: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_district?: string | null
+          address_number?: string | null
+          address_postal_code?: string | null
+          address_state?: string | null
+          address_street?: string | null
           api_key?: string
           api_url?: string
           created_at?: string
+          document?: string | null
           id?: string
           name?: string
           nuvemshop_store_id?: string | null
+          phone?: string | null
           slug?: string
           updated_at?: string
           user_id?: string
