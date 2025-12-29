@@ -28,6 +28,20 @@ export interface ReturnRequest {
   reason: string | null;
   created_at: string;
   updated_at: string;
+  // Shipping fields
+  shipping_provider: string | null;
+  shipping_id: string | null;
+  tracking_code: string | null;
+  label_url: string | null;
+  shipping_cost: number | null;
+  // Customer address
+  customer_phone: string | null;
+  customer_postal_code: string | null;
+  customer_address: string | null;
+  customer_address_number: string | null;
+  customer_district: string | null;
+  customer_city: string | null;
+  customer_state: string | null;
 }
 
 export interface DashboardMetrics {

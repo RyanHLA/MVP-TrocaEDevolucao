@@ -13,6 +13,16 @@ export interface StoreWithSettings {
   created_at: string;
   updated_at: string;
   user_id: string;
+  // Address fields for shipping
+  address_street: string | null;
+  address_number: string | null;
+  address_complement: string | null;
+  address_district: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_postal_code: string | null;
+  phone: string | null;
+  document: string | null;
   settings?: {
     id: string;
     return_window_days: number;
@@ -153,6 +163,58 @@ export function useDeleteStore() {
     onError: (error: Error) => {
       toast({
         title: "Erro ao remover loja",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export interface StoreAddressData {
+  address_street: string;
+  address_number: string;
+  address_complement?: string;
+  address_district: string;
+  address_city: string;
+  address_state: string;
+  address_postal_code: string;
+  phone: string;
+  document: string;
+}
+
+export function useUpdateStoreAddress() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ storeId, address }: { storeId: string; address: StoreAddressData }) => {
+      const { error } = await supabase
+        .from('stores')
+        .update({
+          address_street: address.address_street,
+          address_number: address.address_number,
+          address_complement: address.address_complement || null,
+          address_district: address.address_district,
+          address_city: address.address_city,
+          address_state: address.address_state,
+          address_postal_code: address.address_postal_code,
+          phone: address.phone,
+          document: address.document,
+        })
+        .eq('id', storeId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stores'] });
+      toast({
+        title: "Endereço atualizado",
+        description: "O endereço da loja foi salvo com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao salvar endereço",
         description: error.message,
         variant: "destructive",
       });
