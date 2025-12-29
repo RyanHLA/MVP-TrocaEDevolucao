@@ -6,52 +6,40 @@ export function LandingHero() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-secondary/20" />
-      
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse-glow" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl animate-pulse-glow delay-300" />
-      </div>
-
+    <section className="relative min-h-screen flex items-center justify-center pt-16">
       <div className="container relative z-10 px-4 py-20">
-        <div className="max-w-4xl mx-auto text-center animate-fade-in">
+        <div className="max-w-3xl mx-auto text-center animate-fade-in">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 border border-border mb-8">
-            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <span className="text-sm text-muted-foreground">Integrado com Nuvem Shop</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-8">
+            <span className="w-1.5 h-1.5 rounded-full bg-success" />
+            <span className="text-sm font-medium text-primary">Integrado com Nuvem Shop</span>
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-            Transforme{" "}
-            <span className="gradient-text">devoluções</span>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight text-foreground">
+            Transforme devoluções
             <br />
-            em{" "}
-            <span className="gradient-accent-text">receita retida</span>
+            em <span className="text-primary">receita retida</span>
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-10">
             Converta reembolsos em créditos na loja com bônus atrativo. 
             Simplifique operações de troca e devolução enquanto mantém seu faturamento.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-16">
             <Button 
-              variant="hero" 
               size="xl" 
               onClick={() => navigate('/signup')}
-              className="group"
+              className="gap-2"
             >
               Começar gratuitamente
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-4 h-4" />
             </Button>
             <Button 
-              variant="hero-outline" 
+              variant="outline" 
               size="xl"
               onClick={() => navigate('/portal/demo')}
             >
@@ -60,24 +48,21 @@ export function LandingHero() {
           </div>
 
           {/* Features grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
             <FeatureCard
-              icon={<RefreshCw className="w-6 h-6" />}
+              icon={<RefreshCw className="w-5 h-5" />}
               title="Trocas Simplificadas"
-              description="Portal white-label para seus clientes solicitarem trocas"
-              delay="delay-100"
+              description="Portal white-label para seus clientes"
             />
             <FeatureCard
-              icon={<CreditCard className="w-6 h-6" />}
+              icon={<CreditCard className="w-5 h-5" />}
               title="Crédito com Bônus"
-              description="Incentive clientes a escolherem crédito na loja"
-              delay="delay-200"
+              description="Incentive crédito na loja"
             />
             <FeatureCard
-              icon={<BarChart3 className="w-6 h-6" />}
+              icon={<BarChart3 className="w-5 h-5" />}
               title="Analytics Completo"
-              description="Acompanhe métricas de conversão e receita retida"
-              delay="delay-300"
+              description="Métricas de conversão e receita"
             />
           </div>
         </div>
@@ -90,19 +75,17 @@ function FeatureCard({
   icon, 
   title, 
   description, 
-  delay 
 }: { 
   icon: React.ReactNode; 
   title: string; 
   description: string;
-  delay: string;
 }) {
   return (
-    <div className={`stat-card text-left animate-slide-up ${delay}`}>
-      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4">
+    <div className="bg-card border border-border rounded-lg p-5 text-left">
+      <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary mb-3">
         {icon}
       </div>
-      <h3 className="font-semibold mb-2">{title}</h3>
+      <h3 className="font-semibold text-sm mb-1">{title}</h3>
       <p className="text-sm text-muted-foreground">{description}</p>
     </div>
   );

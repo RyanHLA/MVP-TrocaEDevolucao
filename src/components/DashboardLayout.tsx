@@ -6,8 +6,7 @@ import {
   Store, 
   FileText, 
   Settings, 
-  LogOut,
-  ChevronRight 
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -39,21 +38,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const userEmail = user?.email || '';
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-muted/30 flex">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
+      <aside className="w-64 border-r border-border bg-card flex flex-col">
         {/* Logo */}
         <div className="h-16 border-b border-border flex items-center px-6">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-info flex items-center justify-center">
+            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
               <RefreshCw className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-bold">Trocas.app</span>
+            <span className="font-semibold">Trocas.app</span>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -61,25 +60,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                   isActive 
-                    ? "bg-primary text-primary-foreground shadow-md" 
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    ? "bg-primary text-primary-foreground" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <item.icon className="w-5 h-5" />
+                <item.icon className="w-4 h-4" />
                 {item.label}
-                {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
               </Link>
             );
           })}
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-              <span className="text-sm font-medium">{userInitial}</span>
+        <div className="p-3 border-t border-border">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <span className="text-sm font-medium text-muted-foreground">{userInitial}</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{userName}</div>
@@ -88,7 +86,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           <Button 
             variant="ghost" 
-            className="w-full justify-start mt-2 text-muted-foreground"
+            size="sm"
+            className="w-full justify-start mt-1 text-muted-foreground"
             onClick={handleLogout}
           >
             <LogOut className="w-4 h-4 mr-2" />

@@ -36,11 +36,11 @@ export default function Dashboard() {
         <meta name="description" content="Dashboard de gerenciamento de trocas e devoluções." />
       </Helmet>
       <DashboardLayout>
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-6 animate-fade-in">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-semibold mb-1">Dashboard</h1>
+              <p className="text-sm text-muted-foreground">
                 Visão geral das suas trocas e devoluções
               </p>
             </div>
@@ -66,20 +66,20 @@ export default function Dashboard() {
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-32 rounded-xl" />
+                <Skeleton key={i} className="h-28 rounded-lg" />
               ))}
             </div>
           ) : (
             <StatsCards metrics={metrics || { totalRequests: 0, storeCreditConversion: 0, totalRefundedValue: 0, retainedRevenue: 0, bonusCost: 0, pendingRequests: 0 }} />
           )}
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {isLoading ? (
               <>
-                <Skeleton className="h-80 rounded-xl" />
-                <Skeleton className="h-80 rounded-xl" />
+                <Skeleton className="h-72 rounded-lg" />
+                <Skeleton className="h-72 rounded-lg" />
               </>
             ) : (
               <>
